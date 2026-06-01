@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "musicdl"
+version = "0.1.0"
+description = "Spotify-to-Soulseek 320kbps MP3 downloader with genre organisation"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "spotdl>=4.2",
+    "pylast>=5.2",
+    "musicbrainzngs>=0.7",
+    "mutagen>=1.47",
+    "click>=8.1",
+    "rich>=13.0",
+    "tenacity>=8.2",
+    "httpx>=0.27",
+    "pydantic-settings>=2.0",
+    "structlog>=24.0",
+]
+
+[project.optional-dependencies]
+session = [
+    "librosa>=0.10",
+    "soundfile>=0.12",
+    "numpy>=1.26",
+]
+dev = [
+    "pytest>=7.4",
+    "pytest-mock>=3.12",
+    "pytest-cov>=4.1",
+    "respx>=0.21",
+    "pyright>=1.1",
+    "black>=24.0",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+musicdl = "musicdl.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: requires external binaries and network (deselect with '-m not integration')",
+]
+addopts = "-v"
+
+[tool.coverage.run]
+source = ["src/musicdl"]
+omit = ["src/musicdl/__main__.py"]

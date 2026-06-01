@@ -1,0 +1,47 @@
+# musicdl configuration — copy to config.toml and adjust paths/values.
+# Secrets (API keys) belong in .env, not here.
+
+[musicbrainz]
+# Must match MUSICDL_MB_USER_AGENT env var if both are set.
+# Format required by MusicBrainz ToS: "AppName/Version contact@email.com"
+user_agent = "musicdl/0.1 your@email.com"
+
+[sldl]
+# Path to the sldl binary. "sldl" works if it's on your PATH.
+# Install: dotnet tool install -g slsk-batchdl
+binary_path = "sldl"
+# Seconds before giving up on a single download attempt.
+timeout_seconds = 120
+# How many Soulseek results to try before marking as not found.
+max_tries = 5
+
+[download]
+# Base directory for organised music output.
+output_base = "./music"
+# Temporary directory where sldl writes before files are moved.
+staging_dir = "./staging"
+# How many times to retry a failed download before giving up permanently.
+max_retries = 3
+# Try extended mixes first (recommended for DJ use).
+# Searches "Artist - Title extended" with a minimum length before falling back.
+prefer_extended = true
+# Minimum track length in seconds for the extended pass (270 = 4.5 min).
+min_extended_length_seconds = 270
+# Days before retrying a track that wasn't found on Soulseek.
+not_found_retry_days = 3
+
+[genre]
+# Minimum Last.fm tag weight (0–100) to consider a tag as a genre signal.
+min_lastfm_tag_weight = 30
+# How many days to cache genre lookups per artist before re-fetching.
+cache_ttl_days = 30
+
+[database]
+# Path to the SQLite database file.
+path = "./musicdl.db"
+
+[logging]
+# Log level: DEBUG, INFO, WARNING, ERROR
+level = "INFO"
+# Optional log file. Leave empty to log to console only.
+file = ""
