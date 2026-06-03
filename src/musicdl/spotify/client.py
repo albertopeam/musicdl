@@ -86,6 +86,22 @@ class SpotifyClient:
         album = Album.from_url(f"https://open.spotify.com/album/{album_id}")
         return [_song_to_track(s, s.url) for s in album.songs if s is not None]
 
+    def lookup_by_isrc(self, isrc: str) -> TrackMetadata | None:
+        """Return track metadata for a known ISRC code, or None if not found."""
+        _init_spotdl_client()
+        try:
+            from spotdl.utils.spotify import SpotifyClient as SpotdlClient  # type: ignore[import-untyped]
+            spotdl = SpotdlClient.get_instance()
+            results = spotdl._spotify.search(q=f"isrc:{isrc}", type="track", limit=1)  # type: ignore[union-attr]
+            items = results.get("tracks", {}).get("items", [])
+            if not items:
+                return None
+            track_id = items[0]["id"]
+            url = f"https://open.spotify.com/track/{track_id}"
+            return self._fetch_track(track_id, url)
+        except Exception:
+            return None
+
     def _fetch_playlist(self, playlist_id: str) -> list[TrackMetadata]:
         from spotdl.types.playlist import Playlist  # type: ignore[import-untyped]
 
@@ -105,7 +121,7 @@ def _song_to_track(song: object, original_url: str) -> TrackMetadata:
     duration_s: float = float(getattr(song, "duration", 0) or 0)
 
     return TrackMetadata(
-        spotify_track_id=getattr(song, "song_id", "") or "",
+        track_id=getattr(song, "song_id", "") or "",
         spotify_url=original_url,
         title=getattr(song, "name", "Unknown") or "Unknown",
         artists=artists,

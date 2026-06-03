@@ -16,3 +16,6 @@ build/
 htmlcov/
 .pytest_cache/
 .pyright/
+
+/.DS_Store
+.DS_Store

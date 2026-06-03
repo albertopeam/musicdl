@@ -39,11 +39,11 @@ def run_dry(
     seen: set[str] = set()
     n = 0
     for track in tracks:
-        if track.spotify_track_id in seen:
+        if track.track_id in seen:
             continue
-        seen.add(track.spotify_track_id)
+        seen.add(track.track_id)
         n += 1
-        already = db.get_track(track.spotify_track_id)
+        already = db.get_track(track.track_id)
         status_tag = (
             "[dim](already downloaded)[/dim]"
             if already and already.status == "downloaded"
@@ -83,9 +83,9 @@ def run(
 
     seen: set[str] = set()
     for track in tracks:
-        if track.spotify_track_id in seen:
+        if track.track_id in seen:
             continue
-        seen.add(track.spotify_track_id)
+        seen.add(track.track_id)
         _process_track(track, settings, db, downloader, resolver, counts)
 
     db.finish_session(
@@ -115,15 +115,15 @@ def _process_track(
     counts: dict[str, int],
 ) -> None:
     # Deduplication check
-    if not db.should_download(track.spotify_track_id, settings.max_retries, settings.not_found_retry_days):
+    if not db.should_download(track.track_id, settings.max_retries, settings.not_found_retry_days):
         console.print(f"  [dim]SKIP[/dim]  {track.primary_artist.name} — {track.title}")
-        db.mark_skipped(track.spotify_track_id)
+        db.mark_skipped(track.track_id)
         counts["skipped"] += 1
         return
 
     # Ensure track is in DB before downloading
     db.upsert_track(
-        spotify_track_id=track.spotify_track_id,
+        track_id=track.track_id,
         spotify_url=track.spotify_url,
         title=track.title,
         primary_artist=track.primary_artist.name,
@@ -136,6 +136,8 @@ def _process_track(
         track_number=track.track_number,
         disc_number=track.disc_number,
         status="pending",
+        source="soulseek",
+        spotify_id=track.track_id,
     )
 
     # Genre resolution (uses cache — cheap if artist was prefetched)
@@ -148,27 +150,27 @@ def _process_track(
         primary_genre=resolved.primary,
         subgenre=resolved.subgenre,
     )
-    db.set_genre(track.spotify_track_id, resolved.primary, resolved.subgenre, resolved.source)
+    db.set_genre(track.track_id, resolved.primary, resolved.subgenre, resolved.source)
 
-    db.mark_downloading(track.spotify_track_id)
+    db.mark_downloading(track.track_id)
 
     # Download
     try:
         result = downloader.download(track)
     except NotFoundError:
         console.print(f"  [yellow]NOT FOUND[/yellow]  {track.primary_artist.name} — {track.title}  (will retry in {settings.not_found_retry_days}d)")
-        db.mark_not_found(track.spotify_track_id)
+        db.mark_not_found(track.track_id)
         counts["not_found"] += 1
         return
     except DownloadError as exc:
         console.print(f"  [red]FAIL[/red]  {track.primary_artist.name} — {track.title}  ({exc})")
-        db.mark_failed(track.spotify_track_id, str(exc))
+        db.mark_failed(track.track_id, str(exc))
         counts["failed"] += 1
         return
     except Exception as exc:
         console.print(f"  [red]FAIL[/red]  {track.primary_artist.name} — {track.title}  (unexpected: {exc})")
         logger.warning("unexpected_download_error", title=track.title, error=str(exc), exc_info=True)
-        db.mark_failed(track.spotify_track_id, f"unexpected: {exc}")
+        db.mark_failed(track.track_id, f"unexpected: {exc}")
         counts["failed"] += 1
         return
 
@@ -176,7 +178,7 @@ def _process_track(
     if matched is None:
         msg = "File downloaded but could not be matched to track"
         console.print(f"  [red]FAIL[/red]  {track.primary_artist.name} — {track.title}  ({msg})")
-        db.mark_failed(track.spotify_track_id, msg)
+        db.mark_failed(track.track_id, msg)
         counts["failed"] += 1
         return
 
@@ -194,11 +196,11 @@ def _process_track(
     except Exception as exc:
         console.print(f"  [red]FAIL[/red]  {track.primary_artist.name} — {track.title}  (file move failed: {exc})")
         logger.warning("file_move_failed", title=track.title, error=str(exc), exc_info=True)
-        db.mark_failed(track.spotify_track_id, f"file move failed: {exc}")
+        db.mark_failed(track.track_id, f"file move failed: {exc}")
         counts["failed"] += 1
         return
 
-    db.mark_downloaded(track.spotify_track_id, final_path, final_path.stat().st_size)
+    db.mark_downloaded(track.track_id, final_path, final_path.stat().st_size)
     rel = _relative_path(final_path)
     console.print(f"  [green]OK[/green]    {track.primary_artist.name} — {track.title}  → {rel}")
     counts["downloaded"] += 1

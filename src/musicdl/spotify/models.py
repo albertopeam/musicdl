@@ -11,7 +11,7 @@ class ArtistStub:
 
 @dataclass(frozen=True)
 class TrackMetadata:
-    spotify_track_id: str
+    track_id: str
     spotify_url: str
     title: str
     artists: tuple[ArtistStub, ...]

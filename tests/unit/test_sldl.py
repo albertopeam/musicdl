@@ -8,7 +8,7 @@ import pytest
 
 from musicdl.downloader.sldl import DownloadResult, SldlDownloader
 from musicdl.errors import DownloadTimeoutError, NotFoundError
-from musicdl.spotify.models import ArtistStub, TrackMetadata
+from musicdl.spotify.models import TrackMetadata
 
 
 def _make_downloader(staging_dir: Path) -> SldlDownloader:
@@ -32,14 +32,15 @@ class TestClassifyOutcome:
         )
         assert result == DownloadResult.NOT_FOUND
 
-    def test_success_when_returncode_zero_no_files(self) -> None:
-        # sldl may exit 0 with "already exists" message
+    def test_not_found_when_returncode_zero_no_files(self) -> None:
+        # No downloaded files means not found regardless of exit code
         result = SldlDownloader._classify_outcome(_completed(returncode=0), [])
-        assert result == DownloadResult.SUCCESS
+        assert result == DownloadResult.NOT_FOUND
 
-    def test_error_when_nonzero_no_files(self) -> None:
+    def test_not_found_when_nonzero_no_files(self) -> None:
+        # No downloaded files means not found even on connection errors
         result = SldlDownloader._classify_outcome(_completed(returncode=1, stderr="connection refused"), [])
-        assert result == DownloadResult.ERROR
+        assert result == DownloadResult.NOT_FOUND
 
 
 class TestDownload:

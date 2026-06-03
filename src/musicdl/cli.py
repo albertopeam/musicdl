@@ -222,6 +222,142 @@ def retry_cmd(db: Path) -> None:
     console.print(f"[green]Reset {reset} failed track(s) to pending.[/green]")
 
 
+@cli.command("import")
+@click.argument("path", type=click.Path(exists=True, path_type=Path))
+@click.option("--config", "-c", type=click.Path(path_type=Path), default=None)
+@click.option("--db", type=click.Path(path_type=Path), default=None)
+@click.option("--no-spotify", is_flag=True, help="Skip Spotify ISRC lookup (fully offline)")
+@click.option("--classify", "run_classify", is_flag=True, help="Run genre classification after import")
+@click.option("--dry-run", is_flag=True, help="Show what would be imported without writing to DB")
+@click.option("--verbose", "-v", is_flag=True)
+def import_cmd(
+    path: Path,
+    config: Path | None,
+    db: Path | None,
+    no_spotify: bool,
+    run_classify: bool,
+    dry_run: bool,
+    verbose: bool,
+) -> None:
+    """Import local audio files into the library database."""
+    from musicdl.config import load_settings
+    from musicdl.database import Database
+    import musicdl.pipeline_import as imp
+
+    try:
+        settings = load_settings(env_file=config)
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if db:
+        settings = settings.model_copy(update={"db_path": db})
+
+    _configure_logging("DEBUG" if verbose else settings.log_level)
+
+    database = Database(settings.db_path)
+    try:
+        database.migrate()
+    except MusicdlError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    spotify = None
+    if not no_spotify:
+        try:
+            from musicdl.spotify.client import SpotifyClient
+            spotify = SpotifyClient()
+        except Exception:
+            console.print("[yellow]WARN[/yellow]  Spotify unavailable — proceeding without ISRC lookup")
+
+    imp.run_import(path=path, db=database, spotify=spotify, dry_run=dry_run)
+
+    if run_classify and not dry_run:
+        from musicdl.genre.beatport import BeatportScraper
+        from musicdl.genre.cache import GenreCache
+        from musicdl.genre.lastfm import LastFmClient
+        from musicdl.genre.musicbrainz import MusicBrainzClient
+        from musicdl.genre.resolver import GenreResolver
+        try:
+            lastfm = LastFmClient(
+                api_key=settings.lastfm_api_key,
+                api_secret=settings.lastfm_api_secret,
+                min_weight=settings.min_lastfm_tag_weight,
+            )
+            mb = MusicBrainzClient(user_agent=settings.mb_user_agent)
+            resolver = GenreResolver(
+                lastfm=lastfm,
+                musicbrainz=mb,
+                beatport=BeatportScraper(),
+                cache=GenreCache(database, ttl_days=settings.cache_ttl_days),
+            )
+            console.print("\n[bold]Running genre classification...[/bold]\n")
+            imp.run_classify(db=database, resolver=resolver, mode="unclassified")
+        except MusicdlError as exc:
+            raise click.ClickException(str(exc)) from exc
+
+
+@cli.command("classify")
+@click.option("--config", "-c", type=click.Path(path_type=Path), default=None)
+@click.option("--db", type=click.Path(path_type=Path), default=None)
+@click.option("--mode", type=click.Choice(["unclassified", "reclassify", "all"]),
+              default="unclassified", show_default=True,
+              help="unclassified: missing/unknown genre only  "
+                   "reclassify: also retry fallback results  "
+                   "all: re-run every downloaded track")
+@click.option("--dry-run", is_flag=True, help="Show what would be classified without writing")
+@click.option("--verbose", "-v", is_flag=True)
+def classify_cmd(
+    config: Path | None,
+    db: Path | None,
+    mode: str,
+    dry_run: bool,
+    verbose: bool,
+) -> None:
+    """Resolve genres for library tracks that lack confident genre data."""
+    from musicdl.config import load_settings
+    from musicdl.database import Database
+    from musicdl.genre.beatport import BeatportScraper
+    from musicdl.genre.cache import GenreCache
+    from musicdl.genre.lastfm import LastFmClient
+    from musicdl.genre.musicbrainz import MusicBrainzClient
+    from musicdl.genre.resolver import GenreResolver
+    import musicdl.pipeline_import as imp
+
+    try:
+        settings = load_settings(env_file=config)
+        settings.validate_required()
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if db:
+        settings = settings.model_copy(update={"db_path": db})
+
+    _configure_logging("DEBUG" if verbose else settings.log_level)
+
+    database = Database(settings.db_path)
+    try:
+        database.migrate()
+    except MusicdlError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    try:
+        lastfm = LastFmClient(
+            api_key=settings.lastfm_api_key,
+            api_secret=settings.lastfm_api_secret,
+            min_weight=settings.min_lastfm_tag_weight,
+        )
+        mb = MusicBrainzClient(user_agent=settings.mb_user_agent)
+        resolver = GenreResolver(
+            lastfm=lastfm,
+            musicbrainz=mb,
+            beatport=BeatportScraper(),
+            cache=GenreCache(database, ttl_days=settings.cache_ttl_days),
+        )
+    except MusicdlError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    imp.run_classify(db=database, resolver=resolver, mode=mode, dry_run=dry_run)
+
+
 @cli.command("init-config")
 @click.option("--output", "-o", type=click.Path(path_type=Path),
               default=Path("./config.toml"), show_default=True)

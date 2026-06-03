@@ -175,13 +175,60 @@ uv run musicdl status
 uv run musicdl retry
 ```
 
+### Import existing music
+
+Import MP3, FLAC, M4A or WAV files you already have on disk into the library database. Useful when a friend shares tracks, or to bring an existing collection under musicdl management.
+
+```bash
+# Import a folder (recursive)
+uv run musicdl import ~/Music/house
+
+# Import and resolve genres in one step
+uv run musicdl import ~/Music/house --classify
+
+# Preview what would be imported without writing to DB
+uv run musicdl import ~/Music/house --dry-run
+
+# Skip Spotify ISRC lookup (faster, fully offline)
+uv run musicdl import ~/Music/house --no-spotify
+```
+
+What happens during import:
+- Reads existing ID3/Vorbis tags from each file (title, artist, album, ISRC, genre)
+- If the file has an ISRC tag, looks it up on Spotify to get full metadata
+- Tracks without a Spotify match get a stable synthetic ID (`isrc:` or `local:` prefix)
+- Files already in the database are skipped — re-running import is safe
+- Genre from an existing TCON tag is used as-is if it maps to a known genre; otherwise it is left blank for `musicdl classify` to fill in
+
+### Classify genres
+
+Resolve genres for tracks that have no genre data — works on both imported files and Soulseek downloads that fell through to "unknown".
+
+```bash
+# Classify tracks with no genre (default)
+uv run musicdl classify
+
+# Also retry tracks that were classified as fallback/unknown
+uv run musicdl classify --mode reclassify
+
+# Re-run all downloaded tracks
+uv run musicdl classify --mode all
+
+# Preview without writing
+uv run musicdl classify --dry-run
+```
+
+For each track, the genre resolver runs the same waterfall used during download (Last.fm → MusicBrainz → Beatport → fallback) and writes the result both to the database and back into the file's `TCON` tag.
+
 ### Track statuses explained
 
 | Status | Meaning | What to do |
 |---|---|---|
 | `downloaded` | On disk, all good | Nothing |
+| `imported` | Brought in from a local file (`source=imported`) | Nothing |
 | `not found` | Not on Soulseek yet | Auto-retried after 3 days, or force with `--retry-not-found` |
 | `failed` | Hard error (timeout, connection) | Run `uv run musicdl retry` or `--retry-failed` |
+| `missing` | Imported file no longer found at its path | Locate and re-import the file |
 | `pending` | Queued for next run | Will be picked up automatically |
 | `skipped` | Already downloaded, skipped this session | Nothing |
 
@@ -219,6 +266,12 @@ Install the optional audio analysis dependencies:
 ```bash
 uv sync --extra session
 ```
+
+---
+
+## Architecture
+
+See [`.claude/rules/architecture.md`](.claude/rules/architecture.md) for the full architecture reference: data flow, module responsibilities, data model, database schema, and coding rules.
 
 ---
 

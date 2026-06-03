@@ -18,7 +18,7 @@ def tmp_db(tmp_path: Path) -> Database:
 @pytest.fixture
 def sample_track() -> TrackMetadata:
     return TrackMetadata(
-        spotify_track_id="4uLU6hMCjMI75M1A2tKUQC",
+        track_id="4uLU6hMCjMI75M1A2tKUQC",
         spotify_url="https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC",
         title="Glue",
         artists=(ArtistStub(spotify_id="art1", name="Bicep"),),

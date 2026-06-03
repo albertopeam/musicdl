@@ -29,7 +29,7 @@ class TestSanitize:
 class TestBuildTargetPath:
     def _make_track(self, **kwargs: object) -> TrackMetadata:
         defaults = dict(
-            spotify_track_id="id1",
+            track_id="id1",
             spotify_url="https://open.spotify.com/track/id1",
             title="Glue",
             artists=(ArtistStub(spotify_id="a1", name="Bicep"),),
