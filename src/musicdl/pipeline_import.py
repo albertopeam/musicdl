@@ -134,7 +134,7 @@ def _print_import_summary(counts: dict[str, int], dry_run: bool) -> None:
     unclassified = counts["imported"] - counts["matched"]
     if not dry_run and unclassified > 0:
         console.print(
-            f"\n[dim]Run [bold]musicdl classify --unclassified[/bold] to resolve genres "
+            f"\n[dim]Run [bold]musicdl classify[/bold] to resolve genres "
             f"for {unclassified} unmatched track(s).[/dim]"
         )
 

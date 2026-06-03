@@ -202,7 +202,7 @@ if existing is None:
 
 - **Raw SQL only in `database.py`.** No `cursor.execute()` anywhere else.
 - **`pipeline.py` and `pipeline_import.py` are the only modules that import across sub-packages.** Sub-packages are isolated: `genre/` never imports from `downloader/`, `spotify/` never imports from `genre/`.
-- **`cli.py` only calls `pipeline.py` and `pipeline_import.py`.** No direct knowledge of Spotify, sldl, SQLite, or filesystem.
+- **`cli.py` wires up service objects and calls pipeline modules — nothing else.** It may construct `GenreResolver`, `SpotifyClient`, `SldlDownloader`, etc. and pass them to pipeline functions, but contains no business logic: no direct DB queries, no file operations, no Soulseek/Spotify calls.
 - **`errors.py` is imported by every module.** No other cross-cutting imports.
 
 ## Data Flow Direction
@@ -321,27 +321,41 @@ logger = structlog.get_logger()  # module-level, not inside functions
 | `rich` | ≥13.0 | Progress bars, colored output |
 | `sldl` (binary) | latest | Soulseek download engine |
 
-## Directory Structure Example
+## Output Directory Structure
+
+Files go into **`music/{genre}/{subgenre}/{NN - title}.mp3`** — flat, no artist or album subdirectory.
 
 ```
 music/
 ├── electronic/
 │   ├── deep house/
-│   │   └── bicep/
-│   │       └── bicep/
-│   │           └── 01 - glue.mp3
+│   │   └── 01 - glue.mp3
 │   ├── techno/
-│   │   └── charlotte de witte/
-│   │       └── 01 - doppler.mp3
+│   │   └── 01 - doppler.mp3
 │   └── drum and bass/
-│       └── goldie/
-│           └── timeless/
-│               └── 01 - inner city life.mp3
+│       └── 01 - inner city life.mp3
 └── hip-hop/
     └── rap/
-        └── nas/
-            └── illmatic/
-                └── 01 - n.y. state of mind.mp3
+        └── 01 - n.y. state of mind.mp3
 ```
 
-All directory and file names are **lowercased**. Unsafe filesystem characters replaced with `_`. Max 200 chars per path segment.
+**Why flat:** Serato DJ scans genre directories and expects tracks at one level deep inside them. Deep nesting (artist/album subdirs) breaks Serato's library scanner.
+
+All directory and file names are **lowercased**. Unsafe filesystem characters replaced with `_`. Max 200 chars per path segment. Never overwrite — append `_2`, `_3` on collision.
+
+## Status String Constants
+
+Track status values must be defined as constants in `database.py`, not repeated as string literals across modules:
+
+```python
+class TrackStatus:
+    PENDING      = "pending"
+    DOWNLOADING  = "downloading"
+    DOWNLOADED   = "downloaded"
+    NOT_FOUND    = "not_found"
+    FAILED       = "failed"
+    SKIPPED      = "skipped"
+    MISSING      = "missing"
+```
+
+**Why:** Typos in status strings fail silently — a wrong string produces no type error, just broken DB queries or missed matches. Use `TrackStatus.DOWNLOADED`, not `"downloaded"`.

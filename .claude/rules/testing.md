@@ -112,13 +112,16 @@ def test_move_to_library_does_not_overwrite(tmp_path):
 
 Cover every branch of these — they are the core logic:
 
-- `database.should_download()`: None row, downloaded+file exists, downloaded+file missing, failed+retries exhausted, failed+retries remaining
+- `database.should_download()`: None row, downloaded+file exists, downloaded+file missing, failed+retries exhausted, failed+retries remaining, imported+file missing (→ mark_missing, return False)
 - `GenreResolver.resolve()`: cache hit, Last.fm success, MusicBrainz fallback, Beatport fallback, all-unknown
 - `sanitize()`: empty string, only unsafe chars, exactly 200 chars, unicode, leading/trailing spaces
-- `build_target_path()`: known genre+subgenre, unknown genre, missing album name
+- `build_target_path()`: known genre+subgenre, unknown genre — no artist/album in path (flat structure)
 - `SldlDownloader._classify_outcome()`: each `DownloadResult` variant
 - `SpotifyClient.expand_url()`: track, album, playlist URL types, and an invalid URL raising `ValueError`
 - `GenreNormalizer.classify()`: matched tag, noise tag filtered, no match returns `None`
+- `database.list_unclassified_tracks()`: all three modes (`unclassified`, `reclassify`, `all`) return the correct subset
+- `make_local_track_id()`: same artist+title+filename always produces the same hash; changing only file bytes (not metadata) does not change the hash
+- `_process_import()` dedup: test each level independently — skip on track_id match, skip on spotify_id match, skip on local_path match; all three should increment `skipped`, not `imported`
 
 ## What to Skip
 

@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import re
 
+import structlog
+
 from musicdl.errors import SpotifyError
 from musicdl.spotify.models import ArtistStub, TrackMetadata
+
+logger = structlog.get_logger()
 
 _URL_PATTERNS: dict[str, re.Pattern[str]] = {
     "track":    re.compile(r"spotify\.com/track/([A-Za-z0-9]+)"),
@@ -100,6 +104,7 @@ class SpotifyClient:
             url = f"https://open.spotify.com/track/{track_id}"
             return self._fetch_track(track_id, url)
         except Exception:
+            logger.warning("isrc_lookup_failed", isrc=isrc, exc_info=True)
             return None
 
     def _fetch_playlist(self, playlist_id: str) -> list[TrackMetadata]:

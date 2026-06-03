@@ -34,7 +34,8 @@ music-downloader/
 │       ├── __main__.py         # `python -m musicdl` entry point
 │       ├── cli.py              # Click group + all subcommands
 │       ├── config.py           # pydantic-settings Config class
-│       ├── pipeline.py         # Top-level orchestrator
+│       ├── pipeline.py         # Top-level download orchestrator
+│       ├── pipeline_import.py  # Import + classify orchestrator
 │       ├── database.py         # SQLite schema + CRUD + migrations
 │       ├── errors.py           # Custom exception hierarchy
 │       ├── spotify/
@@ -53,8 +54,11 @@ music-downloader/
 │       │   └── detector.py     # Find downloaded file in staging dir
 │       ├── organizer/
 │       │   └── filesystem.py   # build_target_path, sanitize, move_to_library
-│       └── tagger/
-│           └── id3.py          # mutagen ID3v2.4 writer
+│       ├── tagger/
+│       │   └── id3.py          # mutagen ID3v2.4 writer
+│       └── importer/
+│           ├── __init__.py
+│           └── scanner.py      # Scan dirs, read tags → ScannedFile, synthetic IDs
 ├── tests/
 │   ├── conftest.py
 │   ├── unit/
@@ -64,8 +68,7 @@ music-downloader/
 ├── .env.example
 ├── config.example.toml
 ├── README.md                   # Must include legal disclaimer
-├── LICENSE                     # MIT
-└── ARCHITECTURE.md
+└── LICENSE                     # MIT
 ```
 
 **Always use `src/` layout.** Prevents accidental imports of the dev package.
@@ -151,8 +154,18 @@ musicdl download <input_file>   Download tracks from a Spotify URL file
   --db                          Override SQLite DB path
   --dry-run                     Metadata + genre only, no download
   --retry-failed                Retry previously failed tracks
+  --retry-not-found             Retry tracks not found on Soulseek immediately
   --force                       Re-download even if already present
   --verbose / -v                Debug logging
+
+musicdl import <path>           Import local MP3/FLAC/M4A/WAV files into the library
+  --no-spotify                  Skip ISRC lookup (fully offline)
+  --classify                    Run genre classification immediately after import
+  --dry-run                     Preview without writing to DB
+
+musicdl classify                Resolve genres for tracks missing genre data
+  --mode [unclassified|reclassify|all]
+  --dry-run
 
 musicdl status                  Show session history and counts
 musicdl retry                   Re-queue all failed tracks
