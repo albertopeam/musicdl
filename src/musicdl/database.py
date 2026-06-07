@@ -9,6 +9,17 @@ from collections.abc import Generator
 
 from musicdl.errors import DatabaseError
 
+
+class TrackStatus:
+    PENDING      = "pending"
+    DOWNLOADING  = "downloading"
+    DOWNLOADED   = "downloaded"
+    NOT_FOUND    = "not_found"
+    FAILED       = "failed"
+    SKIPPED      = "skipped"
+    MISSING      = "missing"
+
+
 # ---------------------------------------------------------------------------
 # Typed row dataclasses — nothing outside this module sees sqlite3.Row or dict
 # ---------------------------------------------------------------------------
@@ -220,7 +231,7 @@ class Database:
         duration_ms: int | None = None,
         track_number: int | None = None,
         disc_number: int | None = None,
-        status: str = "pending",
+        status: str = TrackStatus.PENDING,
         source: str = "soulseek",
         spotify_id: str | None = None,
     ) -> None:
@@ -395,18 +406,18 @@ class Database:
         row = self.get_track(track_id)
         if row is None:
             return True
-        if row.status == "downloaded" and row.local_path is not None:
+        if row.status == TrackStatus.DOWNLOADED and row.local_path is not None:
             if row.local_path.exists():
                 return False
             # File is gone. Imported tracks are not re-downloaded via Soulseek.
             if row.source == "imported":
                 self.mark_missing(track_id)
                 return False
-        if row.status == "missing":
+        if row.status == TrackStatus.MISSING:
             return False
-        if row.status == "failed" and row.retry_count >= max_retries:
+        if row.status == TrackStatus.FAILED and row.retry_count >= max_retries:
             return False
-        if row.status == "not_found":
+        if row.status == TrackStatus.NOT_FOUND:
             with self._connect() as conn:
                 result = conn.execute(
                     "SELECT julianday('now') - julianday(updated_at) FROM tracks WHERE track_id = ?",

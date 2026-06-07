@@ -164,7 +164,7 @@ def download_cmd(
 @click.option("--limit", default=10, show_default=True, help="Number of recent sessions to show")
 def status_cmd(db: Path, limit: int) -> None:
     """Show recent download sessions and track status counts."""
-    from musicdl.database import Database
+    from musicdl.database import Database, TrackStatus
 
     database = Database(db)
     try:
@@ -199,7 +199,7 @@ def status_cmd(db: Path, limit: int) -> None:
     console.print(table)
 
     # Overall library counts
-    for status_val in ("downloaded", "not_found", "failed", "pending"):
+    for status_val in (TrackStatus.DOWNLOADED, TrackStatus.NOT_FOUND, TrackStatus.FAILED, TrackStatus.PENDING):
         tracks = database.list_tracks_by_status(status_val)
         if tracks:
             console.print(f"  {status_val.replace('_', ' ').capitalize()}: {len(tracks)} track(s)")

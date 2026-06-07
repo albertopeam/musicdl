@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import dataclasses
-import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from musicdl.config import Settings
-from musicdl.database import Database
+from musicdl.database import Database, TrackStatus
 from musicdl.downloader.sldl import DownloadResult, SldlDownloader, SldlResult
-from musicdl.errors import NotFoundError
-from musicdl.genre.cache import GenreCache
+from musicdl.errors import DownloadError
 from musicdl.genre.resolver import GenreResolver, ResolvedGenre
 from musicdl.spotify.client import SpotifyClient
 from musicdl.spotify.models import ArtistStub, TrackMetadata
@@ -73,11 +70,6 @@ def _stub_downloader_success(staging_dir: Path, track: TrackMetadata) -> MagicMo
     return dl
 
 
-def _stub_downloader_fail(error: Exception) -> MagicMock:
-    dl = MagicMock(spec=SldlDownloader)
-    dl.download.side_effect = error
-    return dl
-
 
 def _make_track(
     track_id: str = "track1",
@@ -86,7 +78,7 @@ def _make_track(
     duration_ms: int = 10,
 ) -> TrackMetadata:
     return TrackMetadata(
-        spotify_track_id=track_id,
+        track_id=track_id,
         spotify_url=f"https://open.spotify.com/track/{track_id}",
         title=title,
         artists=(ArtistStub(spotify_id="a1", name=artist),),
@@ -121,7 +113,7 @@ class TestFullPipelineDownloadsAndOrganisesTrack:
         input_file = tmp_path / "urls.txt"
         _write_urls(input_file, ["https://open.spotify.com/track/track1"])
 
-        with patch("musicdl.tagger.id3.tag_file"):  # skip actual mutagen tagging
+        with patch("musicdl.pipeline.tag_file"):  # skip actual mutagen tagging
             counts = pipeline_mod.run(
                 input_file=input_file,
                 settings=settings,
@@ -135,9 +127,9 @@ class TestFullPipelineDownloadsAndOrganisesTrack:
         assert counts["failed"] == 0
         assert counts["skipped"] == 0
 
-        row = db.get_track(track.spotify_track_id)
+        row = db.get_track(track.track_id)
         assert row is not None
-        assert row.status == "downloaded"
+        assert row.status == TrackStatus.DOWNLOADED
         assert row.primary_genre == "electronic"
         assert row.subgenre == "techno"
         assert row.local_path is not None
@@ -157,7 +149,7 @@ class TestPipelineSkipsAlreadyDownloadedTrack:
         track = _make_track()
         # Pre-populate as already downloaded with an existing file
         db.upsert_track(
-            spotify_track_id=track.spotify_track_id,
+            track_id=track.track_id,
             spotify_url=track.spotify_url,
             title=track.title,
             primary_artist=track.primary_artist.name,
@@ -168,7 +160,7 @@ class TestPipelineSkipsAlreadyDownloadedTrack:
         existing_file = tmp_path / "music" / "track.mp3"
         existing_file.parent.mkdir(parents=True)
         existing_file.write_bytes(b"audio")
-        db.mark_downloaded(track.spotify_track_id, existing_file, 5)
+        db.mark_downloaded(track.track_id, existing_file, 5)
 
         downloader = MagicMock(spec=SldlDownloader)
         input_file = tmp_path / "urls.txt"
@@ -205,7 +197,7 @@ class TestPipelineContinuesAfterOneFailedDownload:
 
         downloader = MagicMock(spec=SldlDownloader)
         downloader.download.side_effect = [
-            NotFoundError("not found"),
+            DownloadError("sldl timed out"),
             SldlResult(
                 outcome=DownloadResult.SUCCESS,
                 downloaded_files=[fake_file],
@@ -219,7 +211,7 @@ class TestPipelineContinuesAfterOneFailedDownload:
             "https://open.spotify.com/track/t2",
         ])
 
-        with patch("musicdl.tagger.id3.tag_file"):
+        with patch("musicdl.pipeline.tag_file"):
             counts = pipeline_mod.run(
                 input_file=input_file,
                 settings=settings,
@@ -234,8 +226,8 @@ class TestPipelineContinuesAfterOneFailedDownload:
 
         row1 = db.get_track("t1")
         row2 = db.get_track("t2")
-        assert row1 is not None and row1.status == "failed"
-        assert row2 is not None and row2.status == "downloaded"
+        assert row1 is not None and row1.status == TrackStatus.FAILED
+        assert row2 is not None and row2.status == TrackStatus.DOWNLOADED
 
 
 class TestPipelineHandlesPlaylistExpansion:
@@ -250,7 +242,7 @@ class TestPipelineHandlesPlaylistExpansion:
 
         staging = settings.staging_dir
         staging.mkdir(parents=True)
-        fake_files = []
+        fake_files: list[Path] = []
         for t in tracks:
             f = staging / f"{t.title}.mp3"
             f.write_bytes(b"\xff\xfb" + b"\x00" * 100)
@@ -269,7 +261,7 @@ class TestPipelineHandlesPlaylistExpansion:
         input_file = tmp_path / "urls.txt"
         _write_urls(input_file, ["https://open.spotify.com/playlist/pl1"])
 
-        with patch("musicdl.tagger.id3.tag_file"):
+        with patch("musicdl.pipeline.tag_file"):
             counts = pipeline_mod.run(
                 input_file=input_file,
                 settings=settings,
@@ -306,7 +298,7 @@ class TestPipelineRecordsGenreInDbAndDirectory:
         input_file = tmp_path / "urls.txt"
         _write_urls(input_file, ["https://open.spotify.com/track/track1"])
 
-        with patch("musicdl.tagger.id3.tag_file"):
+        with patch("musicdl.pipeline.tag_file"):
             pipeline_mod.run(
                 input_file=input_file,
                 settings=settings,
@@ -316,7 +308,7 @@ class TestPipelineRecordsGenreInDbAndDirectory:
                 downloader=downloader,
             )
 
-        row = db.get_track(track.spotify_track_id)
+        row = db.get_track(track.track_id)
         assert row is not None
         assert row.primary_genre == "electronic"
         assert row.subgenre == "deep house"

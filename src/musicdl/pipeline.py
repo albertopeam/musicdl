@@ -8,7 +8,7 @@ import structlog
 from rich.console import Console
 
 from musicdl.config import Settings
-from musicdl.database import Database
+from musicdl.database import Database, TrackStatus
 from musicdl.downloader.detector import find_best_match
 from musicdl.downloader.sldl import SldlDownloader
 from musicdl.errors import DownloadError, NotFoundError, SpotifyError
@@ -46,7 +46,7 @@ def run_dry(
         already = db.get_track(track.track_id)
         status_tag = (
             "[dim](already downloaded)[/dim]"
-            if already and already.status == "downloaded"
+            if already and already.status == TrackStatus.DOWNLOADED
             else ""
         )
         console.print(
@@ -135,7 +135,7 @@ def _process_track(
         duration_ms=track.duration_ms,
         track_number=track.track_number,
         disc_number=track.disc_number,
-        status="pending",
+        status=TrackStatus.PENDING,
         source="soulseek",
         spotify_id=track.track_id,
     )
