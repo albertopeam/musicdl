@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from musicdl.organizer.filesystem import build_target_path, move_to_library, sanitize
-from musicdl.spotify.models import ArtistStub, TrackMetadata
 from pathlib import Path
+
+from musicdl.organizer.filesystem import build_target_path, move_to_library, sanitize
 
 
 class TestSanitize:
@@ -27,38 +27,16 @@ class TestSanitize:
 
 
 class TestBuildTargetPath:
-    def _make_track(self, **kwargs: object) -> TrackMetadata:
-        defaults = dict(
-            track_id="id1",
-            spotify_url="https://open.spotify.com/track/id1",
-            title="Glue",
-            artists=(ArtistStub(spotify_id="a1", name="Bicep"),),
-            album_name="Bicep",
-            album_spotify_id="alb1",
-            release_year=2017,
-            duration_ms=375000,
-            track_number=1,
-            disc_number=1,
-            isrc=None,
-            primary_genre="electronic",
-            subgenre="house",
-        )
-        defaults.update(kwargs)
-        return TrackMetadata(**defaults)  # type: ignore[arg-type]
-
     def test_standard_path(self, tmp_path: Path) -> None:
-        track = self._make_track()
-        path = build_target_path(tmp_path, track)
-        assert path == tmp_path / "electronic" / "house" / "bicep" / "bicep" / "01 - glue.mp3"
+        path = build_target_path(tmp_path, "electronic", "house", 1, "Glue")
+        assert path == tmp_path / "electronic" / "house" / "01 - glue.mp3"
 
     def test_unknown_genre_falls_back(self, tmp_path: Path) -> None:
-        track = self._make_track(primary_genre=None, subgenre=None)
-        path = build_target_path(tmp_path, track)
-        assert "unknown" in str(path)
+        path = build_target_path(tmp_path, None, None, 1, "Glue")
+        assert path == tmp_path / "unknown" / "unknown" / "01 - glue.mp3"
 
     def test_track_number_zero_padded(self, tmp_path: Path) -> None:
-        track = self._make_track(track_number=3)
-        path = build_target_path(tmp_path, track)
+        path = build_target_path(tmp_path, "electronic", "house", 3, "Glue")
         assert "03 - glue" in path.name
 
 

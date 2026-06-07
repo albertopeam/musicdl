@@ -228,6 +228,8 @@ def retry_cmd(db: Path) -> None:
 @click.option("--db", type=click.Path(path_type=Path), default=None)
 @click.option("--no-spotify", is_flag=True, help="Skip Spotify ISRC lookup (fully offline)")
 @click.option("--classify", "run_classify", is_flag=True, help="Run genre classification after import")
+@click.option("--move", is_flag=True, default=False,
+              help="Move files into genre/subgenre directories after classifying. Requires --classify.")
 @click.option("--dry-run", is_flag=True, help="Show what would be imported without writing to DB")
 @click.option("--verbose", "-v", is_flag=True)
 def import_cmd(
@@ -236,6 +238,7 @@ def import_cmd(
     db: Path | None,
     no_spotify: bool,
     run_classify: bool,
+    move: bool,
     dry_run: bool,
     verbose: bool,
 ) -> None:
@@ -268,6 +271,9 @@ def import_cmd(
         except Exception:
             console.print("[yellow]WARN[/yellow]  Spotify unavailable — proceeding without ISRC lookup")
 
+    if move and not run_classify:
+        console.print("[yellow]WARN[/yellow]  --move has no effect without --classify")
+
     imp.run_import(path=path, db=database, spotify=spotify, dry_run=dry_run)
 
     if run_classify and not dry_run:
@@ -290,7 +296,10 @@ def import_cmd(
                 cache=GenreCache(database, ttl_days=settings.cache_ttl_days),
             )
             console.print("\n[bold]Running genre classification...[/bold]\n")
-            imp.run_classify(db=database, resolver=resolver, mode="unclassified")
+            imp.run_classify(
+                db=database, resolver=resolver, mode="unclassified",
+                move=move, output_base=settings.output_base,
+            )
         except MusicdlError as exc:
             raise click.ClickException(str(exc)) from exc
 
@@ -303,12 +312,15 @@ def import_cmd(
               help="unclassified: missing/unknown genre only  "
                    "reclassify: also retry fallback results  "
                    "all: re-run every downloaded track")
+@click.option("--move", is_flag=True, default=False,
+              help="Move files into genre/subgenre directories after classifying.")
 @click.option("--dry-run", is_flag=True, help="Show what would be classified without writing")
 @click.option("--verbose", "-v", is_flag=True)
 def classify_cmd(
     config: Path | None,
     db: Path | None,
     mode: str,
+    move: bool,
     dry_run: bool,
     verbose: bool,
 ) -> None:
@@ -355,7 +367,10 @@ def classify_cmd(
     except MusicdlError as exc:
         raise click.ClickException(str(exc)) from exc
 
-    imp.run_classify(db=database, resolver=resolver, mode=mode, dry_run=dry_run)
+    imp.run_classify(
+        db=database, resolver=resolver, mode=mode, dry_run=dry_run,
+        move=move, output_base=settings.output_base,
+    )
 
 
 @cli.command("init-config")

@@ -3,8 +3,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from musicdl.spotify.models import TrackMetadata
-
 _UNSAFE_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 _WHITESPACE_RE = re.compile(r"\s+")
 _MAX_SEGMENT = 200
@@ -20,15 +18,18 @@ def sanitize(name: str) -> str:
     return name[:_MAX_SEGMENT] or "unknown"
 
 
-def build_target_path(base: Path, track: TrackMetadata) -> Path:
-    genre = sanitize(track.primary_genre or "unknown")
-    subgenre = sanitize(track.subgenre or "unknown")
-    artist = sanitize(track.primary_artist.name)
-    album = sanitize(track.album_name or "unknown")
-    number = f"{track.track_number or 0:02d}"
-    title = sanitize(track.title)
-    filename = f"{number} - {title}.mp3"
-    return base / genre / subgenre / artist / album / filename
+def build_target_path(
+    base: Path,
+    primary_genre: str | None,
+    subgenre: str | None,
+    track_number: int | None,
+    title: str,
+) -> Path:
+    genre_dir    = sanitize(primary_genre or "unknown")
+    subgenre_dir = sanitize(subgenre or "unknown")
+    number       = f"{track_number or 0:02d}"
+    filename     = f"{number} - {sanitize(title)}.mp3"
+    return base / genre_dir / subgenre_dir / filename
 
 
 def move_to_library(source: Path, target: Path) -> Path:

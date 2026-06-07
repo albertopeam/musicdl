@@ -306,6 +306,14 @@ class Database:
                     ),
                 )
 
+    def set_local_path(self, track_id: str, path: Path) -> None:
+        with self._connect() as conn:
+            with conn:
+                conn.execute(
+                    "UPDATE tracks SET local_path = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE track_id = ?",
+                    (str(path), track_id),
+                )
+
     def set_genre(
         self,
         track_id: str,

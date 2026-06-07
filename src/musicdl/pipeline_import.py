@@ -144,6 +144,8 @@ def run_classify(
     resolver: GenreResolver,
     mode: str = "unclassified",
     dry_run: bool = False,
+    move: bool = False,
+    output_base: Path | None = None,
 ) -> None:
     """Resolve genres for library tracks that lack confident genre data."""
     tracks = db.list_unclassified_tracks(mode)
@@ -169,7 +171,8 @@ def run_classify(
             progress.update(task, description=f"[dim]{track.primary_artist}[/dim]")
 
             if dry_run:
-                console.print(f"  [dim]WOULD CLASSIFY[/dim]  {track.primary_artist} — {track.title}")
+                move_hint = "  [dim](would move)[/dim]" if move else ""
+                console.print(f"  [dim]WOULD CLASSIFY[/dim]  {track.primary_artist} — {track.title}{move_hint}")
                 counts["classified"] += 1
                 progress.advance(task)
                 continue
@@ -201,6 +204,20 @@ def run_classify(
                 f"  → [cyan]{resolved.primary}/{resolved.subgenre}[/cyan]"
                 f"  [dim]({resolved.source})[/dim]"
             )
+
+            if move and output_base and track.local_path and track.local_path.exists():
+                from musicdl.organizer.filesystem import build_target_path, move_to_library
+                try:
+                    target = build_target_path(
+                        output_base, resolved.primary, resolved.subgenre,
+                        track.track_number, track.title,
+                    )
+                    new_path = move_to_library(track.local_path, target)
+                    db.set_local_path(track.track_id, new_path)
+                    console.print(f"      → [dim]{new_path.relative_to(output_base)}[/dim]")
+                except Exception as exc:
+                    logger.warning("classify_move_failed", track_id=track.track_id, error=str(exc), exc_info=True)
+
             counts["classified"] += 1
             progress.advance(task)
 

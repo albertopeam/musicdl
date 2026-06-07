@@ -191,7 +191,13 @@ def _process_track(
 
     # Organise
     try:
-        target = build_target_path(settings.output_base, track)
+        target = build_target_path(
+            settings.output_base,
+            track.primary_genre,
+            track.subgenre,
+            track.track_number,
+            track.title,
+        )
         final_path = move_to_library(matched, target)
     except Exception as exc:
         console.print(f"  [red]FAIL[/red]  {track.primary_artist.name} — {track.title}  (file move failed: {exc})")
