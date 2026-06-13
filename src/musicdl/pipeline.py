@@ -186,8 +186,12 @@ def _process_track(
     try:
         tag_file(matched, track)
     except Exception as exc:
-        console.print(f"  [yellow]WARN[/yellow]  Tagging failed for '{track.title}': {exc}")
+        console.print(f"  [red]FAIL[/red]  {track.primary_artist.name} — {track.title}  (tagging failed: {exc})")
         logger.warning("tagging_failed", title=track.title, error=str(exc), exc_info=True)
+        matched.unlink(missing_ok=True)
+        db.mark_failed(track.track_id, f"tagging failed: {exc}")
+        counts["failed"] += 1
+        return
 
     # Organise
     try:

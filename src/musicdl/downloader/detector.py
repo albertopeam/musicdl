@@ -26,10 +26,12 @@ def find_best_match(new_files: list[Path], track: TrackMetadata) -> Path | None:
 
     expected_s = track.duration_ms / 1000.0
 
+    readable: list[Path] = []
     for path in new_files:
         actual_s = _get_duration_seconds(path)
         if actual_s is None:
             continue
+        readable.append(path)
         diff = abs(actual_s - expected_s)
         if diff <= _DURATION_TOLERANCE_S:
             logger.debug(
@@ -41,14 +43,17 @@ def find_best_match(new_files: list[Path], track: TrackMetadata) -> Path | None:
             )
             return path
 
-    logger.warning(
-        "detector_no_match",
-        title=track.title,
-        expected_s=round(expected_s, 1),
-        candidates=[p.name for p in new_files],
-    )
-    # Fall back to first file if nothing matches duration — better than nothing
-    return new_files[0] if new_files else None
+    # No duration match — fall back to first readable file (excludes corrupt files)
+    if readable:
+        logger.warning(
+            "detector_no_match",
+            title=track.title,
+            expected_s=round(expected_s, 1),
+            candidates=[p.name for p in readable],
+        )
+        return readable[0]
+
+    return None
 
 
 def _get_duration_seconds(path: Path) -> float | None:

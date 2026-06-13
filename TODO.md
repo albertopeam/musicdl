@@ -13,5 +13,47 @@ The download pipeline already does this correctly via TrackMetadata.primary_arti
 the import pipeline bypasses TrackMetadata and passes primary_artist directly from the TPE1 tag.
 
 Location: pipeline_import.py — _process_import() — the `artist` variable sent to the resolver.
-I would like to define strings in a reusable way instead of repeating it. ie: "downloaded" and others.
-I have seen that we are creating directoris for artists, not clear for me this strategy, I would prefer to have plain genres/subgenres dir with the songs there, so I can use in serato.
+
+---
+
+## tests
+
+### Missing: --move path in run_classify
+No unit test covers the `--move` branch added to `run_classify()` in `pipeline_import.py`.
+A test should use `tmp_path` + real `tmp_db` + mocked resolver and verify:
+- the file is physically moved to `output_base/genre/subgenre/NN - title.mp3`
+- `db.get_track(track_id).local_path` reflects the new path after the move
+- a move failure (e.g. source file missing) is caught and logged, not raised
+
+---
+
+## download pipeline
+
+### Bug: subgenre equals primary genre produces redundant directory
+Some tracks land in `music/electronic/electronic/` because the genre resolver returns
+`subgenre="electronic"` when primary is also `"electronic"` (observed: Young Franco).
+
+Fix: in `genre/normalizer.py` (or `resolver.py`), if `subgenre == primary_genre`, treat subgenre as `None`
+so `build_target_path` falls back to `"unknown"` rather than duplicating the folder name.
+
+---
+
+### Genre quality: several common artists resolve to wrong or unknown genre
+Observed in session log:
+- **Birdee** → `rock` (cache hit — wrong, should be electronic/nu-disco or house)
+- **Cheek** → `hip-hop` (cache hit — wrong for a DJ Gregory house remix)
+- **Vaudafunk** → `unknown` (no resolution from Last.fm or MusicBrainz despite being a known nu-disco artist)
+- **HP Vince**, **Togetherness**, **Judy Albanese** → `unknown`
+
+These are taxonomy and Last.fm tag quality issues. Short-term fix: add these artists / tag mappings to
+`genre/taxonomy.py` GENRE_MAP. Longer term: consider weighting Last.fm tags more carefully or adding
+a Beatport fallback for artists with no Last.fm genre signal.
+
+---
+
+### Data quality: trailing space in artist name from Spotify
+`Etienne de Crécy ` arrives from spotdl with a trailing space. This is cached and queried with the
+trailing space, producing a double-space in the sldl query (`Etienne de Crécy  - Super disco`).
+
+Fix: strip artist names in `spotify/client.py` when building `ArtistStub` (or in `SpotifyClient.expand_url`).
+The same stripping should apply to `title` to prevent similar issues.
