@@ -339,9 +339,27 @@ music/
         └── 01 - n.y. state of mind.mp3
 ```
 
-**Why flat:** Serato DJ scans genre directories and expects tracks at one level deep inside them. Deep nesting (artist/album subdirs) breaks Serato's library scanner.
+**Why flat:** The user manages Serato DJ crates manually inside Serato. The OS directory structure is just filesystem organisation — Serato reads it like a normal file browser. Artist/album subdirs are omitted because they add no value for DJ browsing and the genre/subgenre two-level structure is the user's preferred organisation.
+
+**Special cases in `build_target_path`:**
+- When both genre and subgenre are `"unknown"`, the subgenre dir is omitted: `music/unknown/NN - title.mp3`
+- When genre is known but subgenre is `"unknown"`, the subgenre dir is kept: `music/electronic/unknown/NN - title.mp3` (visible signal that the track needs `classify`)
 
 All directory and file names are **lowercased**. Unsafe filesystem characters replaced with `_`. Max 200 chars per path segment. Never overwrite — append `_2`, `_3` on collision.
+
+## ResolvedGenre Construction
+
+Never construct `ResolvedGenre` directly outside of `_UNKNOWN`. Always use the `_resolved()` helper in `genre/resolver.py`:
+
+```python
+# Correct
+return _resolved(match[0], match[1], "lastfm")
+
+# Wrong — bypasses subgenre dedup
+return ResolvedGenre(primary=match[0], subgenre=match[1], source="lastfm")
+```
+
+**Why:** `_resolved()` collapses `subgenre == primary` to `"unknown"`, preventing `music/electronic/electronic/` directories when Last.fm returns a generic tag like `"electronic"` with no more specific signal.
 
 ## Status String Constants
 

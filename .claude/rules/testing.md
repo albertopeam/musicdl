@@ -122,6 +122,7 @@ Cover every branch of these — they are the core logic:
 - `database.list_unclassified_tracks()`: all three modes (`unclassified`, `reclassify`, `all`) return the correct subset
 - `make_local_track_id()`: same artist+title+filename always produces the same hash; changing only file bytes (not metadata) does not change the hash
 - `_process_import()` dedup: test each level independently — skip on track_id match, skip on spotify_id match, skip on local_path match; all three should increment `skipped`, not `imported`
+- `find_best_match()`: empty list → None; all files unreadable → None (never return a corrupt file as fallback); readable file outside tolerance → fallback to readable not corrupt; duration within ±3s → exact match returned
 
 ## What to Skip
 
