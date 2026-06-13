@@ -29,15 +29,6 @@ A test should use `tmp_path` + real `tmp_db` + mocked resolver and verify:
 
 ## download pipeline
 
-### Bug: subgenre equals primary genre produces redundant directory
-Some tracks land in `music/electronic/electronic/` because the genre resolver returns
-`subgenre="electronic"` when primary is also `"electronic"` (observed: Young Franco).
-
-Fix: in `genre/normalizer.py` (or `resolver.py`), if `subgenre == primary_genre`, treat subgenre as `None`
-so `build_target_path` falls back to `"unknown"` rather than duplicating the folder name.
-
----
-
 ### Genre quality: several common artists resolve to wrong or unknown genre
 Observed in session log:
 - **Birdee** → `rock` (cache hit — wrong, should be electronic/nu-disco or house)
@@ -49,11 +40,3 @@ These are taxonomy and Last.fm tag quality issues. Short-term fix: add these art
 `genre/taxonomy.py` GENRE_MAP. Longer term: consider weighting Last.fm tags more carefully or adding
 a Beatport fallback for artists with no Last.fm genre signal.
 
----
-
-### Data quality: trailing space in artist name from Spotify
-`Etienne de Crécy ` arrives from spotdl with a trailing space. This is cached and queried with the
-trailing space, producing a double-space in the sldl query (`Etienne de Crécy  - Super disco`).
-
-Fix: strip artist names in `spotify/client.py` when building `ArtistStub` (or in `SpotifyClient.expand_url`).
-The same stripping should apply to `title` to prevent similar issues.

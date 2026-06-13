@@ -115,8 +115,8 @@ class SpotifyClient:
 
 
 def _song_to_track(song: object, original_url: str) -> TrackMetadata:
-    raw_artists: list[str] = getattr(song, "artists", None) or []
-    primary_artist: str = getattr(song, "artist", None) or (raw_artists[0] if raw_artists else "Unknown")
+    raw_artists: list[str] = [str(a).strip() for a in (getattr(song, "artists", None) or [])]  # type: ignore[misc]
+    primary_artist: str = (getattr(song, "artist", None) or (raw_artists[0] if raw_artists else "Unknown")).strip()
 
     if not raw_artists:
         raw_artists = [primary_artist]
@@ -128,7 +128,7 @@ def _song_to_track(song: object, original_url: str) -> TrackMetadata:
     return TrackMetadata(
         track_id=getattr(song, "song_id", "") or "",
         spotify_url=original_url,
-        title=getattr(song, "name", "Unknown") or "Unknown",
+        title=(getattr(song, "name", "Unknown") or "Unknown").strip(),
         artists=artists,
         album_name=getattr(song, "album_name", "") or "",
         album_spotify_id=getattr(song, "album_id", "") or "",

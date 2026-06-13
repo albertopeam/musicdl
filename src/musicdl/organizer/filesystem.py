@@ -29,6 +29,8 @@ def build_target_path(
     subgenre_dir = sanitize(subgenre or "unknown")
     number       = f"{track_number or 0:02d}"
     filename     = f"{number} - {sanitize(title)}.mp3"
+    if genre_dir == "unknown" and subgenre_dir == "unknown":
+        return base / genre_dir / filename
     return base / genre_dir / subgenre_dir / filename
 
 

@@ -33,7 +33,11 @@ class TestBuildTargetPath:
 
     def test_unknown_genre_falls_back(self, tmp_path: Path) -> None:
         path = build_target_path(tmp_path, None, None, 1, "Glue")
-        assert path == tmp_path / "unknown" / "unknown" / "01 - glue.mp3"
+        assert path == tmp_path / "unknown" / "01 - glue.mp3"
+
+    def test_known_genre_unknown_subgenre_keeps_subdir(self, tmp_path: Path) -> None:
+        path = build_target_path(tmp_path, "electronic", None, 1, "Glue")
+        assert path == tmp_path / "electronic" / "unknown" / "01 - glue.mp3"
 
     def test_track_number_zero_padded(self, tmp_path: Path) -> None:
         path = build_target_path(tmp_path, "electronic", "house", 3, "Glue")

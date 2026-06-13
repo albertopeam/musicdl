@@ -24,6 +24,14 @@ class ResolvedGenre:
 _UNKNOWN = ResolvedGenre(primary="unknown", subgenre="unknown", source="unknown")
 
 
+def _resolved(primary: str, subgenre: str, source: str) -> ResolvedGenre:
+    return ResolvedGenre(
+        primary=primary,
+        subgenre=subgenre if subgenre != primary else "unknown",
+        source=source,
+    )
+
+
 class GenreResolver:
     def __init__(
         self,
@@ -45,7 +53,7 @@ class GenreResolver:
         cached: CachedGenre | None = self._cache.get(artist_name)
         if cached is not None:
             logger.debug("genre_cache_hit", artist=artist_name, genre=cached.primary)
-            return ResolvedGenre(primary=cached.primary, subgenre=cached.subgenre, source=cached.source)
+            return _resolved(cached.primary, cached.subgenre, cached.source)
 
         result = (
             self._try_lastfm(artist_name)
@@ -80,7 +88,7 @@ class GenreResolver:
 
         match = classify(tags)
         if match:
-            return ResolvedGenre(primary=match[0], subgenre=match[1], source="lastfm")
+            return _resolved(match[0], match[1], "lastfm")
         return None
 
     def _try_musicbrainz(self, artist_name: str) -> ResolvedGenre | None:
@@ -92,7 +100,7 @@ class GenreResolver:
 
         match = classify(tags)
         if match:
-            return ResolvedGenre(primary=match[0], subgenre=match[1], source="musicbrainz")
+            return _resolved(match[0], match[1], "musicbrainz")
         return None
 
     def _try_beatport(self, artist_name: str) -> ResolvedGenre | None:
@@ -102,10 +110,10 @@ class GenreResolver:
         # Beatport genres are already clean strings; try normaliser
         match = classify([raw])
         if match:
-            return ResolvedGenre(primary=match[0], subgenre=match[1], source="beatport")
+            return _resolved(match[0], match[1], "beatport")
         # Accept the raw Beatport genre directly as electronic subgenre
         if raw in GENRE_MAP.values() or any(raw == v[1] for v in GENRE_MAP.values()):
-            return ResolvedGenre(primary="electronic", subgenre=raw, source="beatport")
+            return _resolved("electronic", raw, "beatport")
         return None
 
     def _try_spotify(self, genres: list[str]) -> ResolvedGenre | None:
@@ -113,5 +121,5 @@ class GenreResolver:
             return None
         match = classify(genres)
         if match:
-            return ResolvedGenre(primary=match[0], subgenre=match[1], source="spotify")
+            return _resolved(match[0], match[1], "spotify")
         return None
